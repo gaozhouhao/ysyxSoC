@@ -18,7 +18,13 @@ typedef enum [2:0]{
     err_t    
 } state_t;
 
+typedef enum {
+    spi_t,
+    qpi_t
+} mode_t;
+
 state_t state;
+mode_t mode;
 
 wire [ 3:0] din;
 reg [ 3:0] dout, douten;
@@ -36,10 +42,13 @@ end
 
 always @(posedge sck or posedge reset) begin
     //$display("state: %d", state);
+    if (reset)
+        if (cmd == 8'h35) mode <= qpi_t;
+
     if (reset) state <= cmd_t;
     else begin
         case (state)
-        cmd_t:  state <= (cnt == 8'd07) ? addr_t    : state;
+        cmd_t:  state <= (cnt == 8'd01 && mode == qpi_t) ? addr_t    : state;
         addr_t: state <= (cmd != 8'hEB && cmd != 8'h38) ? err_t   :
                          (cmd == 8'hEB && cnt == 8'h05) ? wait_t   :
                          (cmd == 8'h38 && cnt == 8'h05) ? wdata_t   : state;
@@ -47,10 +56,8 @@ always @(posedge sck or posedge reset) begin
         rdata_t: state <= state;
         wdata_t: state <= state;
         default: begin
-            //$display("cmd: %h", cmd);
             state <= state;
             $fwrite(32'h80000002, "Assertion failed: Unsupported command `%xh`, only support `EBh` and `38h` read command\n", cmd);
-            //$finish;
             $fatal;
         end
         endcase
@@ -59,7 +66,10 @@ end
 
 always @(posedge sck or posedge reset) begin
     if (reset)  cmd <= 8'h0;
-    else if (state == cmd_t) cmd <= {cmd[6:0], din[0]};
+    else if (state == cmd_t) begin
+        if (mode == spi_t) cmd <= {cmd[6:0], din[0]};
+        else if (mode == qpi_t) cmd <= {cmd[3:0], din};
+    end
 end
 
 always @(posedge sck or posedge reset) begin
@@ -67,10 +77,8 @@ always @(posedge sck or posedge reset) begin
     else if (state == addr_t) begin
         addr <= {addr[19:0], din};
         cur_waddr <= {cur_waddr[19:0], din};
-        //if(cnt == 8'd5) cur_waddr <= addr;
     end
     else if (state == wdata_t) begin
-        //$display("cur_waddr:%h", cur_waddr);
         if(cnt == 0) mem[cur_waddr][7:4] <= din;
         if(cnt == 1) begin
             mem[cur_waddr][3:0] <= din;
@@ -80,17 +88,11 @@ always @(posedge sck or posedge reset) begin
 end
 
 always @(negedge sck) begin
-    //if(state == wait_t) $display("wait:%h", cnt);
     if(state == wait_t) begin
         if(cnt == 8'd0) cur_raddr <= addr;
     end
     if (state == rdata_t) begin
-        //if(state == wait_t) $display("wait");
-        //$display("raddr:%h", addr);
-        //$display("cur_raddr:%h", cur_raddr);
-        //$display("cnt:%h", cnt);
         douten <= 4'hf;
-        //$display("dout:%d", dout);
         if(cnt == 0) dout <= mem[cur_raddr][7:4];
         if(cnt == 1) begin
             dout <= mem[cur_raddr][3:0];
@@ -105,7 +107,7 @@ always @(posedge sck or posedge reset) begin
     if (reset) cnt <= 8'h0;
     else begin
         case (state)
-            cmd_t:  cnt <= (cnt < 8'd7 ) ? cnt + 1'b1 : 8'd0;
+            cmd_t:  cnt <= (cnt < ((mode == spi_t) ? 8'd7 : 8'd1)) ? cnt + 1'b1 : 8'd0;
             addr_t: cnt <= (cnt < 8'd5) ? cnt + 1'b1 : 8'd0;
             wait_t: cnt <= (cnt < 8'd5) ? cnt + 1'b1 : 8'd0;
             wdata_t: cnt <= (cnt < 8'd1) ? cnt + 1'b1 : 8'd0;

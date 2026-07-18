@@ -39,8 +39,9 @@ module EF_PSRAM_CTRL_wb (
     output  wire [3:0]      douten
 );
 
-    localparam  ST_IDLE = 1'b0,
-                ST_WAIT = 1'b1;
+    localparam  ST_INIT = 2'd0,
+                ST_IDLE = 2'd1,
+                ST_WAIT = 2'd2;
 
     wire        mr_sck;
     wire        mr_ce_n;
@@ -60,24 +61,30 @@ module EF_PSRAM_CTRL_wb (
     wire        mw_wr;
     wire        mw_done;
 
+    wire [23:0] mw_addr;
+    wire [ 7:0] mw_cmd;
+    wire        mw_mode;
+
     //wire        doe;
 
     // WB Control Signals
     wire        wb_valid        =   cyc_i & stb_i;
-    wire        wb_we           =   we_i & wb_valid;
+    wire        wb_we           =   (state==ST_INIT) ? 1'b1 : we_i & wb_valid;
     wire        wb_re           =   ~we_i & wb_valid;
     //wire[3:0]   wb_byte_sel     =   sel_i & {4{wb_we}};
 
     // The FSM
-    reg         state, nstate;
+    reg     [1:0]   state, nstate;
     always @ (posedge clk_i or posedge rst_i)
         if(rst_i)
-            state <= ST_IDLE;
+            state <= ST_INIT;
         else
             state <= nstate;
 
     always @* begin
         case(state)
+            ST_INIT : 
+                if (mw_done) nstate = ST_IDLE;
             ST_IDLE :
                 if(wb_valid)
                     nstate = ST_WAIT;
@@ -89,6 +96,7 @@ module EF_PSRAM_CTRL_wb (
                     nstate = ST_IDLE;
                 else
                     nstate = ST_WAIT;
+            default:;
         endcase
     end
 
@@ -128,7 +136,7 @@ module EF_PSRAM_CTRL_wb (
                       */
 
     assign mr_rd    = ( (state==ST_IDLE ) & wb_re );
-    assign mw_wr    = ( (state==ST_IDLE ) & wb_we );
+    assign mw_wr    = ( (state==ST_IDLE ) & wb_we ) | (state == ST_INIT);
 
     PSRAM_READER MR (
         .clk(clk_i),
@@ -149,17 +157,23 @@ module EF_PSRAM_CTRL_wb (
     PSRAM_WRITER MW (
         .clk(clk_i),
         .rst_n(~rst_i),
-        .addr({adr_i[23:0]}),
+        .addr(mw_addr),
         .wr(mw_wr),
         .size(size),
         .done(mw_done),
         .line(wdata),
+        .cmd(mw_cmd),
+        .mode(mw_mode),
         .sck(mw_sck),
         .ce_n(mw_ce_n),
         .din(mw_din),
         .dout(mw_dout),
         .douten(mw_doe)
     );
+
+    assign mw_addr = (state == ST_INIT) ? 24'h0 : adr_i[23:0];
+    assign mw_cmd = (state == ST_INIT) ? 8'h35 : 8'h38;
+    assign mw_mode = (state == ST_INIT) ? 1'h0 : 1'h1;
 
     assign sck  = wb_we ? mw_sck  : mr_sck;
     assign ce_n = wb_we ? mw_ce_n : mr_ce_n;
