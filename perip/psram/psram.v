@@ -6,7 +6,6 @@ module psram(
 
 logic [7:0] mem[0: 1 << 24 - 1];
 
-assign dio = 4'bz;
 wire    reset = ce_n;
 
 typedef enum [2:0]{
@@ -58,7 +57,7 @@ always @(posedge sck or posedge reset) begin
         default: begin
             state <= state;
             $fwrite(32'h80000002, "Assertion failed: Unsupported command `%xh`, only support `EBh` and `38h` read command\n", cmd);
-            $fatal;
+            //$fatal;
         end
         endcase
     end
@@ -87,11 +86,12 @@ always @(posedge sck or posedge reset) begin
     end
 end
 
-always @(negedge sck) begin
+always @(negedge sck or posedge reset) begin
     if(state == wait_t) begin
         if(cnt == 8'd0) cur_raddr <= addr;
     end
-    if (state == rdata_t) begin
+    if (reset) douten <= 4'h0;
+    else if (state == rdata_t) begin
         douten <= 4'hf;
         if(cnt == 0) dout <= mem[cur_raddr][7:4];
         if(cnt == 1) begin
