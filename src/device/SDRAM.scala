@@ -2,7 +2,8 @@ package ysyx
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.Analog
+//import chisel3.experimental.Analog
+import chisel3.experimental.{Analog, attach}
 
 import freechips.rocketchip.amba.axi4._
 import freechips.rocketchip.amba.apb._
@@ -11,6 +12,21 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util._
 
 class SDRAMIO extends Bundle {
+  val clk = Output(Bool())
+  val cke = Output(Bool())
+  val cs  = Output(Bool())
+  val ras = Output(Bool())
+  val cas = Output(Bool())
+  val we  = Output(Bool())
+  val a   = Output(UInt(13.W))
+  val ba  = Output(UInt(2.W))
+  val dqm = Output(UInt(4.W))
+  val dqLo  = Analog(16.W)
+  val dqHi  = Analog(16.W)
+}
+
+
+class SDRAMChipIO extends Bundle {
   val clk = Output(Bool())
   val cke = Output(Bool())
   val cs  = Output(Bool())
@@ -42,11 +58,45 @@ class sdram_top_apb extends BlackBox {
 }
 
 class sdram extends BlackBox {
-  val io = IO(Flipped(new SDRAMIO))
+  val io = IO(Flipped(new SDRAMChipIO))
 }
 
 class sdramChisel extends RawModule {
   val io = IO(Flipped(new SDRAMIO))
+
+  val chip0 = Module(new sdram)
+  val chip1 = Module(new sdram)
+
+  chip0.io.clk := io.clk
+  chip1.io.clk := io.clk
+
+  chip0.io.cke := io.cke
+  chip1.io.cke := io.cke
+
+  chip0.io.cs := io.cs
+  chip1.io.cs := io.cs
+
+  chip0.io.ras := io.ras
+  chip1.io.ras := io.ras
+
+  chip0.io.cas := io.cas
+  chip1.io.cas := io.cas
+
+  chip0.io.we := io.we
+  chip1.io.we := io.we
+
+  chip0.io.a := io.a
+  chip1.io.a := io.a
+
+  chip0.io.ba := io.ba
+  chip1.io.ba := io.ba
+
+  // DQM
+  chip0.io.dqm := io.dqm(1,0)
+  chip1.io.dqm := io.dqm(3,2)
+
+  attach(chip0.io.dq, io.dqLo)
+  attach(chip1.io.dq, io.dqHi)
 }
 
 class AXI4SDRAM(address: Seq[AddressSet])(implicit p: Parameters) extends LazyModule {
