@@ -14,7 +14,7 @@ module sdram_top_apb (
 
   output        sdram_clk,
   output        sdram_cke,
-  output        sdram_cs,
+  output [ 1:0] sdram_cs,
   output        sdram_ras,
   output        sdram_cas,
   output        sdram_we,

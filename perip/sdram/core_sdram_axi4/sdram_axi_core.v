@@ -51,7 +51,7 @@ module sdram_axi_core
     ,output [ 31:0]  inport_read_data_o
     ,output          sdram_clk_o
     ,output          sdram_cke_o
-    ,output          sdram_cs_o
+    ,output [  1:0]  sdram_cs_o
     ,output          sdram_ras_o
     ,output          sdram_cas_o
     ,output          sdram_we_o
@@ -177,9 +177,11 @@ reg  [STATE_W-1:0]     target_state_q;
 reg  [STATE_W-1:0]     delay_state_q;
 
 // Address bits
-wire [SDRAM_ROW_W-1:0]  addr_col_w  = {{(SDRAM_ROW_W-SDRAM_COL_W){1'b0}}, ram_addr_w[SDRAM_COL_W:2], 1'b0};
-wire [SDRAM_ROW_W-1:0]  addr_row_w  = ram_addr_w[SDRAM_ADDR_W:SDRAM_COL_W+2+1];
-wire [SDRAM_BANK_W-1:0] addr_bank_w = ram_addr_w[SDRAM_COL_W+2:SDRAM_COL_W+2-1];
+// dqm -> col -> bank -> row -> cs
+wire [SDRAM_ROW_W-1:0]  addr_col_w  = {{(SDRAM_ROW_W-SDRAM_COL_W){1'b0}}, ram_addr_w[SDRAM_COL_W+1:2]};
+wire [SDRAM_ROW_W-1:0]  addr_row_w  = ram_addr_w[SDRAM_ADDR_W+1:SDRAM_COL_W+2+1+1];
+wire [SDRAM_BANK_W-1:0] addr_bank_w = ram_addr_w[SDRAM_COL_W+3:SDRAM_COL_W+2];
+wire                    cs_w = ram_addr_w[26];
 
 //-----------------------------------------------------------------
 // SDRAM State Machine
@@ -713,7 +715,8 @@ assign sdram_data_output_o   =  data_q;
 assign sdram_data_in_w       = sdram_data_input_i;
 
 assign sdram_cke_o  = cke_q;
-assign sdram_cs_o   = command_q[3];
+assign sdram_cs_o[0]   = command_q[3] ? 1'b1 : cs_w;
+assign sdram_cs_o[1]   = command_q[3] ? 1'b1 :  ~cs_w;
 assign sdram_ras_o  = command_q[2];
 assign sdram_cas_o  = command_q[1];
 assign sdram_we_o   = command_q[0];
