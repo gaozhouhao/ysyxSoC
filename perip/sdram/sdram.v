@@ -96,12 +96,6 @@ module sdram(
           rd_row_r <= a;
           rd_ba_r <= ba;
         end
-        // CMD_WRITE: begin
-        //   wr_col_r <= a[8:0];
-        // end
-        // CMD_READ: begin
-        //   rd_col_r <= a[8:0];
-        // end
         default;
       endcase
     end
@@ -111,83 +105,86 @@ module sdram(
   // WRITE
   /////////////
   always @(posedge clk) begin
-    case (wr_state)
-      WR_IDLE: begin
-        if (cmd == CMD_WRITE) begin
-          wr_col_r <= a[8:0] + 1'b1;
-          wr_cnt <= wr_cnt + 4'b1;
-          bank[wr_ba_r][wr_row_r][a[8:0]][7:0] <= dqm[0] ? bank[wr_ba_r][wr_row_r][a[8:0]][7:0] : din[7:0];
-          bank[wr_ba_r][wr_row_r][a[8:0]][15:8] <= dqm[1] ? bank[wr_ba_r][wr_row_r][a[8:0]][15:8] : din[15:8];
-          wr_state <= WRITE;
+    if (cs == 1'b0) begin
+      case (wr_state)
+        WR_IDLE: begin
+          if (cmd == CMD_WRITE) begin
+            wr_col_r <= a[8:0] + 1'b1;
+            wr_cnt <= wr_cnt + 4'b1;
+            bank[wr_ba_r][wr_row_r][a[8:0]][7:0] <= dqm[0] ? bank[wr_ba_r][wr_row_r][a[8:0]][7:0] : din[7:0];
+            bank[wr_ba_r][wr_row_r][a[8:0]][15:8] <= dqm[1] ? bank[wr_ba_r][wr_row_r][a[8:0]][15:8] : din[15:8];
+            wr_state <= WRITE;
+          end
+          else begin
+            wr_state <= WR_IDLE;
+            wr_cnt <= 4'b0;
+          end
         end
-        else begin
-          wr_state <= WR_IDLE;
-          wr_cnt <= 4'b0;
+        WRITE: begin
+          if (wr_cnt == BL_NUM) begin
+            wr_cnt <= 0;
+            wr_state <= WR_IDLE;
+          end
+          else begin
+            wr_cnt <= wr_cnt + 1;
+            wr_col_r <= wr_col_r + 1'b1;
+            bank[wr_ba_r][wr_row_r][wr_col_r][7:0] <= dqm[0] ? bank[wr_ba_r][wr_row_r][wr_col_r][7:0] : din[7:0];
+            bank[wr_ba_r][wr_row_r][wr_col_r][15:8] <= dqm[1] ? bank[wr_ba_r][wr_row_r][wr_col_r][15:8] : din[15:8];
+            wr_state <= WRITE;
+          end
         end
-      end
-    
-      WRITE: begin
-        if (wr_cnt == BL_NUM) begin
-          wr_cnt <= 0;
-          wr_state <= WR_IDLE;
-        end
-        else begin
-          wr_cnt <= wr_cnt + 1;
-          wr_col_r <= wr_col_r + 1'b1;
-          bank[wr_ba_r][wr_row_r][wr_col_r][7:0] <= dqm[0] ? bank[wr_ba_r][wr_row_r][wr_col_r][7:0] : din[7:0];
-          bank[wr_ba_r][wr_row_r][wr_col_r][15:8] <= dqm[1] ? bank[wr_ba_r][wr_row_r][wr_col_r][15:8] : din[15:8];
-          wr_state <= WRITE;
-        end
-      end
-      default: ;
-    endcase
+        default: ;
+      endcase
+    end
   end
 
   ///////////
   // READ
   ////////////
   always @(posedge clk) begin
-    case (rd_state)
-      RD_IDLE: begin
-        rd_cnt <= 4'd0;
-        if (cmd == CMD_READ) begin
-          rd_col_r <= a[8:0];
-          wait_cnt <= wait_cnt + 3'b1;
-          rd_state <= WAIT;
+    if (cs == 1'b0) begin
+      case (rd_state)
+        RD_IDLE: begin
+          rd_cnt <= 4'd0;
+          if (cmd == CMD_READ) begin
+            rd_col_r <= a[8:0];
+            wait_cnt <= wait_cnt + 3'b1;
+            rd_state <= WAIT;
+          end
+          else begin
+            douten <= 2'b11;
+            wait_cnt <= 3'd0;
+            rd_state <= RD_IDLE;
+          end
         end
-        else begin
-          douten <= 2'b11;
-          wait_cnt <= 3'd0;
-          rd_state <= RD_IDLE;
+        WAIT: begin
+          if (wait_cnt + 1'b1 < CL_NUM) begin
+            wait_cnt <= wait_cnt + 1'b1;
+            rd_state <= WAIT;
+          end
+          else begin
+            douten <= dqm;
+            dout <= bank[rd_ba_r][rd_row_r][rd_col_r];
+            rd_cnt <= rd_cnt + 1'b1;
+            rd_col_r <= rd_col_r + 1'b1;
+            rd_state <= READ;
+          end
         end
-      end
-      WAIT: begin
-        if (wait_cnt + 1'b1 < CL_NUM) begin
-          wait_cnt <= wait_cnt + 1'b1;
-          rd_state <= WAIT;
+        READ: begin
+          if (rd_cnt < BL_NUM) begin
+            dout <= bank[rd_ba_r][rd_row_r][rd_col_r];
+            rd_cnt <= rd_cnt + 1'b1;
+            rd_col_r <= rd_col_r + 1'b1;
+            rd_state <= READ;
+          end
+          else begin
+            douten <= 2'b11;
+            rd_state <= RD_IDLE;
+          end
         end
-        else begin
-          douten <= dqm;
-          dout <= bank[rd_ba_r][rd_row_r][rd_col_r];
-          rd_cnt <= rd_cnt + 1'b1;
-          rd_col_r <= rd_col_r + 1'b1;
-          rd_state <= READ;
-        end
-      end
-      READ: begin
-        if (rd_cnt < BL_NUM) begin
-          dout <= bank[rd_ba_r][rd_row_r][rd_col_r];
-          rd_cnt <= rd_cnt + 1'b1;
-          rd_col_r <= rd_col_r + 1'b1;
-          rd_state <= READ;
-        end
-        else begin
-          douten <= 2'b11;
-          rd_state <= RD_IDLE;
-        end
-      end
-      default: ;
-    endcase
+        default: ;
+      endcase
+    end
   end
 
 
