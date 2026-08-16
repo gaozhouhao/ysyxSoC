@@ -56,11 +56,11 @@ module gpio_top_apb(
           else if (addr == 32'h8)
             seg <= in_pwdata & mask;
         end
-        else begin // read
-          if (addr == 32'h4) begin
+        // else begin // read
+        //   if (addr == 32'h4) begin
             
-          end
-        end
+        //   end
+        // end
       end
     end
   end
@@ -68,17 +68,18 @@ module gpio_top_apb(
 
 
 
-  // always @(posedge clock) begin
-  //   if(reset == 1'b0) begin
-  //     led <= 16'b0;
-  //     key <= 16'b0;
-  //   end
-  //   else begin
-  //     key <= gpio_in;
-  //   end
+  always @(posedge clock) begin
+    if(reset == 1'b1) begin
+      led <= 16'b0;
+      key <= 16'b0;
+    end
+    else begin
+      key <= gpio_in;
+    end
     
-  // end
+  end
 
+  assign in_prdata = {16'b0, key};
   assign gpio_out = led;
 
   assign gpio_seg_0 = ~segs[seg[3:0]];
