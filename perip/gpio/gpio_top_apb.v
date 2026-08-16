@@ -67,7 +67,6 @@ module gpio_top_apb(
 
 
 
-
   always @(posedge clock) begin
     if(reset == 1'b1) begin
       led <= 16'b0;
