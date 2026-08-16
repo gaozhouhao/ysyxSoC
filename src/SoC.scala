@@ -147,6 +147,8 @@ class ysyxSoCFull(implicit p: Parameters) extends LazyModule {
     val sdram = Module(new sdramChisel)
     sdram.io <> masic.sdram
 
+    // CLINT
+    val clint = Module(new CLINT)
 
     val externalPins = IO(new Bundle{
       val gpio = chiselTypeOf(masic.gpio)
