@@ -66,7 +66,6 @@ endmodule
 
 
 
-
 module vga_ctrl(
     input           pclk,     //25MHz时钟
     input           reset,    //置位
