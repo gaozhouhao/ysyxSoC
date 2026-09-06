@@ -33,19 +33,20 @@ module sdram_top_axi(
 
   output        sdram_clk,
   output        sdram_cke,
-  output        sdram_cs,
+  output [ 1:0] sdram_cs,
   output        sdram_ras,
   output        sdram_cas,
   output        sdram_we,
   output [12:0] sdram_a,
   output [ 1:0] sdram_ba,
   output [ 3:0] sdram_dqm,
-  inout  [31:0] sdram_dq
+  inout  [15:0] sdram_dqLo,
+  inout  [15:0] sdram_dqHi
 );
 
   wire sdram_dout_en;
   wire [31:0] sdram_dout;
-  assign sdram_dq = sdram_dout_en ? sdram_dout : 32'bz;
+  assign {sdram_dqHi, sdram_dqLo} = sdram_dout_en ? sdram_dout : 32'bz;
   sdram_axi #(
     .SDRAM_MHZ(100),
     .SDRAM_ADDR_W(24),
@@ -91,7 +92,7 @@ module sdram_top_axi(
     .sdram_dqm_o(sdram_dqm),
     .sdram_addr_o(sdram_a),
     .sdram_ba_o(sdram_ba),
-    .sdram_data_input_i(sdram_dq),
+    .sdram_data_input_i({sdram_dqHi, sdram_dqLo}),
     .sdram_data_output_o(sdram_dout),
     .sdram_data_out_en_o(sdram_dout_en)
   );

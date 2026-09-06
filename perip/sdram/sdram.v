@@ -174,7 +174,10 @@ module sdram(
             dout <= bank[rd_ba_r][active_row_r[rd_ba_r]][rd_col_r];
             rd_cnt <= rd_cnt + 1'b1;
             rd_col_r <= rd_col_r + 1'b1;
-            rd_state <= READ;
+            if (BL_NUM == 1)
+              rd_state <= RD_IDLE;
+            else
+              rd_state <= READ;
           end
         end
         READ: begin
