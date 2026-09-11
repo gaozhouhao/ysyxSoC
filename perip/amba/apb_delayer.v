@@ -20,7 +20,7 @@ module apb_delayer(
   output        out_pwrite,
   output [31:0] out_pwdata,
   output [3:0]  out_pstrb,
-  input         out_pready,
+  input         out_pready, 
   input  [31:0] out_prdata,
   input         out_pslverr
 );
@@ -124,3 +124,4 @@ module apb_delayer(
   assign in_pslverr = delay_done ? pslverr  : 1'b0;
 
 endmodule
+
